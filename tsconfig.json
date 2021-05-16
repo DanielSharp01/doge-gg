@@ -4,6 +4,9 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "target": "ES6",
+    "lib": [
+      "ESNext.String"
+    ],
     "noImplicitAny": false,
     "moduleResolution": "node",
     "sourceMap": true,
