@@ -51,10 +51,11 @@ export class DiscordBot {
     return discordId ? `<@${discordId}>` : summonerName;
   }
 
-  printScoreTable(scores: Array<PlayerWithScore>) {
+  printScoreTable(header: string, scores: Array<PlayerWithScore>) {
     const sortedScores = [...scores];
     sortedScores.sort((a, b) => b.score - a.score);
-    const table = new AsciiTable()
+    const table = new AsciiTable(header);
+    table.set
     table.setHeading('Place', 'Name', 'Score', 'Kills', 'Deaths');
     sortedScores.forEach((s, i) => table.addRow(i + 1, s.summonerName, s.score, s.kills, s.deaths));
     this.sendMessage(table.toString(), { code: true });

@@ -25,7 +25,6 @@ export class Game {
 
     startBountyGame(discordBot: DiscordBot, summoner: string, champion: string): boolean {
         if (this.bountyGames.some(b => wsr(b.enemy.championName) === wsr(champion))) return true;
-
         const poster = this.players.find(p => p.summonerName === summoner);
         const team = poster.team;
         const allies = this.players.filter(p => p.team === team);

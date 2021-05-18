@@ -11,7 +11,7 @@ export class BountyGame {
         this.discordBot.messageEngine.bountyMessage(poster, enemy);
         if (this.allies.some(a => a.score > 0 || a.kills > 0 || a.deaths > 0)) {
             this.discordBot.sendMessage('This game is already running. Here are the scores so far:')
-            this.discordBot.printScoreTable(this.allies);
+            this.discordBot.printScoreTable(`${this.enemy.championName}'s bounty`, this.allies);
         }
     }
 
@@ -31,7 +31,7 @@ export class BountyGame {
     }
 
     public onGameOver() {
-        this.discordBot.printScoreTable(this.allies);
+        this.discordBot.printScoreTable(`${this.enemy.championName}'s bounty`, this.allies);
         const maxScore = Math.max(...this.allies.map(p => p.score));
         const winners = this.allies.filter(p => p.score === maxScore);
         this.discordBot.messageEngine.gameOverMessage(winners);

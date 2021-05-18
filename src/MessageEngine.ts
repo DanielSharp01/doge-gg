@@ -16,13 +16,13 @@ export interface MessageEngineData {
     bountyMessages: StringKeyedStringArray;
     aliases: StringKeyedStringArray;
     gameOverMessages: {
-        total_tie: Array<string>,
+        totaltie: Array<string>,
         positive: Array<string>,
-        positive_tie: Array<string>,
+        positivetie: Array<string>,
         zero: Array<string>,
-        zero_tie: Array<string>,
+        zerotie: Array<string>,
         negative: Array<string>,
-        negative_tie: Array<string>,
+        negativetie: Array<string>,
     }
 }
 
@@ -33,6 +33,7 @@ function randomlyPick(arr: Array<string>): string {
 }
 
 export function wsr(str: string): string {
+    if (!str) return undefined;
     return str.replace(/(?<!vs)[\s](?!vs)/g, '').toLowerCase();
 }
 
@@ -43,7 +44,7 @@ export class MessageEngine {
         killDeathMessages: {},
         bountyMessages: {},
         aliases: {},
-        gameOverMessages: { negative: [], negative_tie: [], zero: [], zero_tie: [], positive: [], positive_tie: [], total_tie: [] },
+        gameOverMessages: { negative: [], negativetie: [], zero: [], zerotie: [], positive: [], positivetie: [], totaltie: [] },
     };
 
     private aliasReverseMap: AliasReverseMap;
@@ -206,15 +207,15 @@ export class MessageEngine {
 
         this.discordBot.sendMessage(this.processGameOverMessage((() => {
             if (winners.length === 5) {
-                return randomlyPick(this.engineData.gameOverMessages.total_tie);
+                return randomlyPick(this.engineData.gameOverMessages.totaltie);
             } else if (winnerScore < 0) {
-                if (winners.length > 1) return randomlyPick(this.engineData.gameOverMessages.negative_tie);
+                if (winners.length > 1) return randomlyPick(this.engineData.gameOverMessages.negativetie);
                 return randomlyPick(this.engineData.gameOverMessages.negative);
             } else if (winnerScore === 0) {
-                if (winners.length > 1) return randomlyPick(this.engineData.gameOverMessages.zero_tie);;
+                if (winners.length > 1) return randomlyPick(this.engineData.gameOverMessages.zerotie);;
                 return randomlyPick(this.engineData.gameOverMessages.zero);
             } else {
-                if (winners.length > 1) return randomlyPick(this.engineData.gameOverMessages.positive_tie);
+                if (winners.length > 1) return randomlyPick(this.engineData.gameOverMessages.positivetie);
                 return randomlyPick(this.engineData.gameOverMessages.positive);
             }
         })(), { winner }));
