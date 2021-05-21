@@ -9,9 +9,18 @@ import { wsr } from './MessageEngine';
 export class Game {
     private lastEventId: number = -1;
     private events: Array<GameEvent> = [];
-    private players: Array<Player>;
+    private _players: Array<Player>;
     private bountyGames: Array<BountyGame> = [];
     private gameReadyPromise: Promise<void>;
+    private _activePlayer: string;
+
+    public get players() {
+        return this._players;
+    }
+
+    public get activePlayer() {
+        return this._activePlayer;
+    }
 
     constructor() {
         this.gameReadyPromise = this.awaitGameStart().then(() => {
@@ -20,15 +29,15 @@ export class Game {
     }
 
     async awaitGame(summoner: string): Promise<Game> {
-        return Promise.race([this.gameReadyPromise.then(() => this.players.find(p => p.summonerName === summoner) ? this : null), sleep(30000).then(() => null)]);
+        return Promise.race([this.gameReadyPromise.then(() => this._players.find(p => p.summonerName === summoner) ? this : null), sleep(30000).then(() => null)]);
     }
 
     startBountyGame(discordBot: DiscordBot, summoner: string, champion: string): boolean {
         if (this.bountyGames.some(b => wsr(b.enemy.championName) === wsr(champion))) return true;
-        const poster = this.players.find(p => p.summonerName === summoner);
+        const poster = this._players.find(p => p.summonerName === summoner);
         const team = poster.team;
-        const allies = this.players.filter(p => p.team === team);
-        const enemies = this.players.filter(p => p.team !== team);
+        const allies = this._players.filter(p => p.team === team);
+        const enemies = this._players.filter(p => p.team !== team);
         const enemy = enemies.find(e => wsr(e.championName) === wsr(champion));
         if (enemy) {
             this.bountyGames.push(new BountyGame(allies, this.events, poster, enemy, discordBot));
@@ -56,7 +65,9 @@ export class Game {
                 if (res[0] && res[0].summonerName) {
                     this.events = [];
                     this.lastEventId = -1;
-                    return this.players = res;
+                    this._activePlayer = await fetch('https://127.0.0.1:2999/liveclientdata/activeplayername').then(res => res.json())
+                    this._players = res;
+                    return res;
                 }
             } catch (err) {
             }
@@ -64,7 +75,7 @@ export class Game {
         }
     }
 
-    private async requestEvents(): Promise<Array<any>> {
+    private async requestEvents(): Promise<Array<GameEvent>> {
         const events = (await fetch(`https://127.0.0.1:2999/liveclientdata/eventdata?eventID=${this.lastEventId + 1}`).then(res => res.json()).then(res => res.Events)) ?? [];
         if (events.length > 0) this.lastEventId = events[events.length - 1].EventID;
         return events;

@@ -4,6 +4,7 @@ import { PlayerWithScore } from "./PlayerWithScore";
 import AsciiTable from 'ascii-table';
 import { MessageEngine } from './MessageEngine';
 import { Game } from './Game';
+import { CharmServer } from './CharmServer';
 
 export class DiscordBot {
   private summoners: { [key: string]: string } = {};
@@ -11,6 +12,8 @@ export class DiscordBot {
   private currentChannel?: TextChannel = null;
   public messageEngine: MessageEngine;
   private game: Game;
+  private charmServer;
+  private trackCharms = false;
 
   constructor() {
     if (fs.existsSync('./summoners.json')) {
@@ -19,6 +22,7 @@ export class DiscordBot {
       this.saveSummoners();
     }
     this.game = new Game();
+    this.charmServer = new CharmServer(() => this.charmTrackingStarted(), (hitCount, charmCount) => this.charmTrackingOver(hitCount, charmCount));
     this.messageEngine = new MessageEngine(this);
     this.client.on('message', (message) => this.onMessage(message));
 
@@ -169,5 +173,19 @@ export class DiscordBot {
     try {
       this.currentChannel?.send(message, options);
     } catch (err) { }
+  }
+
+  charmTrackingStarted(): void {
+    if (this.game.activePlayer == "Tilted Fox" && this.game.players.find(p => p.summonerName === this.game.activePlayer).championName == "Ahri") {
+      this.sendMessage('Tracking your charms ' + this.getMentionOrNot('Tilted Fox') + '. Good luck :smile:');
+      this.trackCharms = true;
+    }
+  }
+
+  charmTrackingOver(hitCount: any, charmCount: any): void {
+    if (this.trackCharms) {
+      this.sendMessage(`Game ended with ${hitCount} hits and ${charmCount - hitCount} misses for a hit ratio of ${Math.round(hitCount / charmCount * 10000) / 100}%`)
+    }
+    this.trackCharms = false;
   }
 }
