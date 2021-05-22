@@ -4,25 +4,20 @@ import { PlayerWithScore } from "./PlayerWithScore";
 import AsciiTable from 'ascii-table';
 import { MessageEngine } from './MessageEngine';
 import { Game } from './Game';
-import { CharmServer } from './CharmServer';
 
 export class DiscordBot {
   private summoners: { [key: string]: string } = {};
   private client = new Client();
   private currentChannel?: TextChannel = null;
   public messageEngine: MessageEngine;
-  private game: Game;
-  private charmServer;
   private trackCharms = false;
 
-  constructor() {
+  constructor(private game: Game) {
     if (fs.existsSync('./summoners.json')) {
       this.summoners = JSON.parse(fs.readFileSync('./summoners.json', { encoding: 'utf8' }));
     } else {
       this.saveSummoners();
     }
-    this.game = new Game();
-    this.charmServer = new CharmServer(() => this.charmTrackingStarted(), (hitCount, charmCount) => this.charmTrackingOver(hitCount, charmCount));
     this.messageEngine = new MessageEngine(this);
     this.client.on('message', (message) => this.onMessage(message));
 
@@ -83,7 +78,7 @@ export class DiscordBot {
     } else if (command.startsWith('bounty ')) {
       const summoner = this.getSummoner(message.author.id);
       if (!summoner) {
-        this.sendMessage(`I don't know you <@${message.author.id}>. Please use the !gg me <summoner name> command`);
+        this.sendMessage(`I don't know you <@${message.author.id}>. Please use the \`!gg me <summoner name>\` command`);
         return;
       }
       const game = await this.game.awaitGame(summoner);
@@ -162,6 +157,20 @@ export class DiscordBot {
         message.reply(error.message);
         message.react('❌');
       }
+    } else if (command.startsWith('charm')) {
+      const summoner = this.getSummoner(message.author.id);
+      if (!summoner) {
+        this.sendMessage(`I don't know you <@${message.author.id}>. Please use the \`!gg me <summoner name>\` command`);
+        return;
+      }
+      const game = await this.game.awaitGame(summoner);
+      if (game) {
+        if (!game.startCharmGame(this, summoner)) {
+          this.sendMessage(`<@${message.author.id}> :x: Could not  track charms ${this.getMentionOrNot(game.activePlayer)} is not playing Ahri :frown:`);
+          return;
+        }
+      }
+      else this.sendMessage(`<@${message.author.id}> :x: Could not track charms the game is not even running (at least not for the bot host) :rolling_eyes:`);
     }
   }
 
@@ -173,19 +182,5 @@ export class DiscordBot {
     try {
       this.currentChannel?.send(message, options);
     } catch (err) { }
-  }
-
-  charmTrackingStarted(): void {
-    if (this.game.activePlayer == "Tilted Fox" && this.game.players.find(p => p.summonerName === this.game.activePlayer).championName == "Ahri") {
-      this.sendMessage('Tracking your charms ' + this.getMentionOrNot('Tilted Fox') + '. Good luck :smile:');
-      this.trackCharms = true;
-    }
-  }
-
-  charmTrackingOver(hitCount: any, charmCount: any): void {
-    if (this.trackCharms) {
-      this.sendMessage(`Game ended with ${hitCount} hits and ${charmCount - hitCount} misses for a hit ratio of ${Math.round(hitCount / charmCount * 10000) / 100}%`)
-    }
-    this.trackCharms = false;
   }
 }

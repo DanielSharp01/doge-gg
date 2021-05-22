@@ -1,9 +1,10 @@
 import { config } from 'dotenv';
-import { CharmServer } from './CharmServer';
 import { DiscordBot } from './DiscordBot';
+import { Game } from './Game';
+import { startWebsocketServer } from './WebsocketServer';
 
 config();
 
-process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-
-const bot = new DiscordBot();
+const game = new Game();
+startWebsocketServer(game);
+const discordBot = new DiscordBot(game);

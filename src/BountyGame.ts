@@ -4,11 +4,15 @@ import { DiscordBot } from './DiscordBot';
 import { GameEvent } from './GameEvent';
 
 export class BountyGame {
+    type: 'bounty';
     private allies: Array<PlayerWithScore>;
-    public constructor(allies: Array<Player>, events: Array<GameEvent>, poster: Player, public enemy: Player, private discordBot: DiscordBot) {
+    public constructor(private discordBot: DiscordBot, allies: Array<Player>, poster: Player, public enemy: Player) {
         this.allies = allies.map(a => ({ ...a, score: 0, kills: 0, deaths: 0 }));
-        events.forEach(e => this.onEvent(e, false));
         this.discordBot.messageEngine.bountyMessage(poster, enemy);
+    }
+
+    public processExistingEvents(events: GameEvent[]) {
+        events.forEach(e => this.onEvent(e, false));
         if (this.allies.some(a => a.score > 0 || a.kills > 0 || a.deaths > 0)) {
             this.discordBot.sendMessage('This game is already running. Here are the scores so far:')
             this.discordBot.printScoreTable(`${this.enemy.championName}'s bounty`, this.allies);

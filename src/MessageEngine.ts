@@ -34,7 +34,7 @@ function randomlyPick(arr: Array<string>): string {
 
 export function wsr(str: string): string {
     if (!str) return undefined;
-    return str.replace(/(?<!vs)[\s](?!vs)/g, '').toLowerCase();
+    return str.replace(/(?<!vs)[\s](?!vs)/g, '').replace(/[\/\']/, '').toLowerCase();
 }
 
 export class MessageEngine {
