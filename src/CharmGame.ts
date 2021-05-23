@@ -21,10 +21,8 @@ export class CharmGame {
 
     public onEvent(event: GameEvent, announce: boolean) {
         if (event.EventName === 'CharmCast') {
-            if (announce) this.discordBot.sendMessage(':eyes:');
             this.charmCast++;
         } else if (event.EventName === 'CharmHit') {
-            if (announce) this.discordBot.sendMessage(':heart:');
             this.charmHit++;
         }
     }
