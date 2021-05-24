@@ -35,6 +35,8 @@ export type ParserError<T> =
     } | {
         name: 'expectAnyWord'
         wordKey: keyof T;
+    } | {
+        name: 'expectEnded'
     } | CustomError;
 
 function wordCase(word: string, caseSensitive: boolean): string {
@@ -97,6 +99,11 @@ export class CommandParser<T extends { [key: string]: string }> {
 
         return new CommandParser('', this.parameters)
             .setParameter(key, (this.remaining || null) as T[keyof T]);
+    }
+
+    expectEnded(): CommandParser<T> {
+        if (!this.error && this.remaining.trim().length > 0) return new CommandParser<T>(this.remaining, this.parameters, { name: 'expectEnded' });
+        return this;
     }
 
     expectAnyWord(wordKey: keyof T): CommandParser<T> {
