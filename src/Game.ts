@@ -6,7 +6,7 @@ import { MiniGame } from './MiniGame';
 export class Game {
     private events: Array<GameEvent> = [];
     private _players: Array<Player>;
-    private miniGames: Array<MiniGame> = [];
+    public miniGames: Array<MiniGame> = [];
     private _clientUuids = new Set<string>();
     private _lastHadClients = 0;
 

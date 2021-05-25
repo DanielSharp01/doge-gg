@@ -37,6 +37,12 @@ export type ParserError<T> =
         wordKey: keyof T;
     } | {
         name: 'expectEnded'
+    } | {
+        name: 'expectVariable',
+        missingDollar?: boolean,
+        missingVariable?: boolean,
+        missingEquals?: boolean,
+        missingValue?: boolean,
     } | CustomError;
 
 function wordCase(word: string, caseSensitive: boolean): string {
@@ -149,6 +155,27 @@ export class CommandParser<T extends { [key: string]: string }> {
         })).mapError((e: any) => ({ name: 'expectUntilAnyOfWords', words, wordKey, key, missingBetween: e.errors.some(e => e.missingBetween), missing: e.errors.some(e => e.missing) }));
     }
 
+    expectVariable(): CommandParser<T> {
+        if (this.error) return this;
+
+        let remaining = this.remaining.trim();
+        if (!remaining.startsWith('$')) return new CommandParser<T>(this.remaining, this.parameters, { name: 'expectVariable', missingDollar: true });
+        let index = remaining.indexOf('$', 1);
+        if (index < 0) index = undefined;
+        const variable = remaining.slice(1, index);
+        if (variable.trim().length == 0) return new CommandParser<T>(this.remaining, this.parameters, { name: 'expectVariable', missingVariable: true });
+        if (!variable.includes('=')) return new CommandParser<T>(this.remaining, this.parameters, { name: 'expectVariable', missingEquals: true });
+        const [key, value] = variable.split('=');
+        if (!value || value.trim().length == 0) return new CommandParser<T>(this.remaining, this.parameters, { name: 'expectVariable', missingValue: true });
+        return new CommandParser(index ? remaining.slice(index) : '', this.parameters, this.error).setParameter(key, value as T[keyof T]);
+    }
+
+    expectVariables(): CommandParser<T> {
+        if (this.error) return this;
+        if (this.remaining.trim().length == 0) return this;
+        return this.expectVariable().expectVariables();
+    }
+
     choice(...parsings: Array<(p: CommandParser<T>) => CommandParser<T>>): CommandParser<T> {
         if (this.error) return this;
 
@@ -173,9 +200,13 @@ export class CommandParser<T extends { [key: string]: string }> {
         return new CommandParser<T>(this.remaining, newParamerers);
     }
 
-    mapError(mapper: (err: ParserError<T>) => ParserError<T>): CommandParser<T> {
-        if (this.error) return new CommandParser(this.remaining, this.parameters, mapper(this.error));
-        else return this;
+    mapError(mapper: (err: ParserError<T>, p?: Partial<T>) => ParserError<T>): CommandParser<T> {
+        if (!this.error) return this;
+        return new CommandParser(this.remaining, this.parameters, mapper(this.error, this.parameters));
+    }
+
+    remapError(mapper: (err: ParserError<T>, p?: Partial<T>) => ParserError<T>): CommandParser<T> {
+        return new CommandParser(this.remaining, this.parameters, mapper(this.error, this.parameters));
     }
 
     execute(callback: (p: Partial<T>, parser?: CommandParser<T>) => void): CommandParser<T> {

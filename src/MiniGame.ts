@@ -16,7 +16,7 @@ export abstract class MiniGame {
     abstract onGameOver();
     abstract equals(miniGame: MiniGame): boolean;
 
-    protected get textChannel() { return this.context.textChannel; }
+    public get textChannel() { return this.context.textChannel; }
     protected get summonerCache() { return this.context.summonerCache; }
     protected get messageEngine() { return this.context.messageEngine; }
 

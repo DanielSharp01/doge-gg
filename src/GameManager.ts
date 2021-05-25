@@ -9,7 +9,7 @@ import { SummonerCache } from './SummonerCache';
 import { MiniGame } from './MiniGame';
 
 export class GameManager {
-    private games: Game[] = [];
+    public games: Game[] = [];
 
     constructor(private messageEngine: MessageEngine, private summonerCache: SummonerCache) {
     }
@@ -39,6 +39,10 @@ export class GameManager {
 
     createMiniGameContext(textChannel: TextChannel) {
         return { textChannel, messageEngine: this.messageEngine, summonerCache: this.summonerCache };
+    }
+
+    findGame(summoner: string) {
+        return this.games.find(g => g.players.some(p => p.summonerName == summoner));
     }
 
     async waitForGame(finder: () => Game): Promise<Game> {

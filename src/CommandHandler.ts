@@ -4,6 +4,9 @@ import readline from 'readline';
 import { SummonerCache } from './SummonerCache';
 import { Message, TextChannel } from 'discord.js';
 import { GameManager } from './GameManager';
+import { BountyGame } from './BountyGame';
+import { wsr } from './wsr';
+import { ChampionCache } from './ChampionCache';
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -14,13 +17,9 @@ type aliasHandlerArgs = { action?: string, champion?: string, what?: string };
 type onHandlerVsArgs = { killer: string, victim: string, action: string, what?: string };
 type onHandlerArgs = { key: string, action: string, what?: string };
 
-// TODO: Actual command logic
-
 export class CommandHandler {
     private currentMessage: Message;
-    // TODO: ChampionCache
-    constructor(private summonerCache: SummonerCache, private messageEngine: MessageEngine, private gameManager: GameManager) {
-
+    constructor(private summonerCache: SummonerCache, private championCache: ChampionCache, private messageEngine: MessageEngine, private gameManager: GameManager) {
     }
 
     errorMessage(message: string) {
@@ -45,7 +44,7 @@ export class CommandHandler {
         if (!message.content.startsWith('!gg')) return;
         this.currentMessage = message;
         const parser = new CommandParser<{ action: string }>(message.content);
-        const actions = ['me', 'charm', 'bounty', 'on', 'alias'];
+        const actions = ['me', 'charm', 'score', 'bounty', 'on', 'alias'];
         parser.expectWord('!gg').expectAnyWord('action')
             .executeError(() => {
                 this.errorMessage(`No action specified use one of ${actions.map(a => `\`${a}\``).join(', ')}`);
@@ -58,6 +57,9 @@ export class CommandHandler {
                     case 'charm':
                         this.charmHandler();
                         break;
+                    case 'score':
+                        this.scoreHandler();
+                        break;
                     case 'bounty':
                         this.bountyHandler(parser.reparemetrize<{ champion: string }>());
                         break;
@@ -68,7 +70,7 @@ export class CommandHandler {
                         this.onHandler(parser.reparemetrize<{ event: string }>());
                         break;
                     case 'test':
-                        // TODO: Test command
+                        this.testHandler(parser.reparemetrize<{ event: string, key: string }>());
                         break;
                     default:
                         this.errorMessage(`No such action \`${action}\` use one of ${actions.map(a => `\`${a}\``).join(', ')}`);
@@ -131,6 +133,18 @@ export class CommandHandler {
         }
     }
 
+    scoreHandler() {
+        const summoner = this.getSummoner();
+        if (!summoner) return;
+        const miniGames = this.gameManager.games.map(g => g.miniGames).flat().filter(mg => mg.textChannel == this.currentMessage.channel && mg instanceof BountyGame).map(mg => mg as BountyGame);
+        if (miniGames.length == 0) {
+            this.currentMessage.channel.send('There are no bounty games that you participate in :confused:');
+        }
+        for (const miniGame of miniGames) {
+            miniGame.printScoreTable()
+        }
+    }
+
     messageHandler<M extends { [key: string]: string, action: string, what: string }>(
         parser: CommandParser<M>,
         keyParsing: (p: CommandParser<M>) => CommandParser<M>,
@@ -186,31 +200,41 @@ export class CommandHandler {
                 );
             },
             ({ champion }) => {
+                if (!this.validateChampion(champion)) return;
                 this.currentMessage.channel.send(
                     this.messageEngine.listMessages('aliases', champion).join('\n') || 'No aliases found.',
                     { split: true },
                 );
             },
             ({ champion, what }) => {
+                if (!this.validateChampion(champion)) return;
                 this.messageEngine.addMessage('aliases', champion, what);
                 this.currentMessage.react('👍');
             },
             ({ champion, what }) => {
+                if (!this.validateChampion(champion)) return;
                 this.messageEngine.removeMessage('aliases', champion, what);
                 this.currentMessage.react('👍');
             },
         );
     }
+    validateChampion(champion: string): boolean {
+        if (champion != '?' && !this.championCache.getChampionFromString(champion)) {
+            this.errorMessage(`${champion} is not a valid champion or skin.`);
+            return false;
+        }
+
+        return true;
+    }
 
     onHandler(parser: CommandParser<{ event: string }>) {
         const eventKeyParser = parser.expectAnyWord('event');
-        const championVSEventKeys = ['kill', 'death', 'killDeath'];
         const event = eventKeyParser.parameters.event.replace('kill-death', 'killDeath');
         const codifyVariables = str => {
             return str.replaceAll(/(\$[A-Za-z0-9_]*)/g, "`$1`");
         }
 
-        if (championVSEventKeys.includes(event)) {
+        if (this.isVsEvent(event)) {
             this.messageHandler(eventKeyParser.reparemetrize<onHandlerVsArgs>(),
                 p => p
                     .optionalUntilWord('killer', 'vs', false)
@@ -228,16 +252,19 @@ export class CommandHandler {
                     );
                 },
                 ({ killer, victim }) => {
+                    if (!this.validateChampion(killer) || !this.validateChampion(victim)) return;
                     this.currentMessage.channel.send(
                         this.messageEngine.listMessages(`${event}Messages`, `${killer ?? '?'} vs ${victim ?? '?'}`).map(codifyVariables).join('\n') || 'No messages found.',
                         { split: true },
                     );
                 },
                 ({ killer, victim, what }) => {
+                    if (!this.validateChampion(killer) || !this.validateChampion(victim)) return;
                     this.messageEngine.addMessage(`${event}Messages`, `${killer} vs ${victim}`, what);
                     this.currentMessage.react('👍');
                 },
                 ({ killer, victim, what }) => {
+                    if (!this.validateChampion(killer) || !this.validateChampion(victim)) return;
                     this.messageEngine.removeMessage(`${event}Messages`, `${killer} vs ${victim}`, what);
                     this.currentMessage.react('👍');
                 },
@@ -270,5 +297,108 @@ export class CommandHandler {
         }
 
         return eventKeyParser;
+    }
+
+    isVsEvent(event: string) {
+        const championVSEventKeys = ['kill', 'death', 'killDeath'];
+        return championVSEventKeys.includes(event);
+    }
+
+    testHandler(parser: CommandParser<{ event: string, key: string }>) {
+        parser.expectAnyWord('event').executeError(() => {
+            this.errorMessage(`Expected event`);
+        }).choice(
+            p => p.expectUntilEnd('key').remapError((e, p) => {
+                if (e) return e;
+                if (p.key.includes('$')) return { name: 'custom' };
+                return e;
+            }),
+            p => p.expectUntilWord('key', 'for').expectVariables().executeError((e, p) => {
+                if (e.name == 'expectUntilWord') {
+                    if (e.missing || e.missingBetween) {
+                        if (this.isVsEvent(p.event.replace('kill-death', 'killDeath'))) {
+                            this.errorMessage(`Expected \`<killer> vs <victim>\``);
+                        } else {
+                            this.errorMessage(`Expected ${p.event == 'alias' ? 'champion' : 'key'}`);
+                        }
+                    }
+                    else {
+                        this.errorMessage(`Expected \`for\` before variable list`);
+                    }
+                } else if (e.name == 'expectVariable') {
+                    if (e.missingDollar) {
+                        this.errorMessage(`Expected $`);
+                    } else if (e.missingEquals) {
+                        this.errorMessage(`Expected =`);
+                    } else if (e.missingVariable) {
+                        this.errorMessage(`Expected variable name`);
+                    } else if (e.missingValue) {
+                        this.errorMessage(`Expected variable value`);
+                    }
+                }
+            })
+        ).execute((p: any) => {
+            const supportedEvents = ['kill', 'death', 'bounty', 'gameover', 'alias'];
+            if (!supportedEvents.includes(p.event.toLowerCase())) {
+                this.errorMessage(`Unsupported event supported events are ${supportedEvents.map(e => `\`${e}\``)}`);
+                return;
+            }
+            if (this.isVsEvent(p.event) && !p.key.includes(' vs ')) {
+                this.errorMessage(`Expected \`<killer> vs <victim>\``);
+                return;
+            }
+            let killerChampion, killerSkin, victimChampion, victimSkin;
+            let champion, skin;
+            if (this.isVsEvent(p.event)) {
+                const [killer, victim] = p.key.split(' vs ').map(p => p.trim());
+                killerChampion = this.championCache.getChampionFromString(wsr(killer));
+                killerSkin = this.championCache.getSkinFromString(wsr(killer));
+                victimChampion = this.championCache.getChampionFromString(wsr(victim));
+                victimSkin = this.championCache.getSkinFromString(wsr(victim));
+
+                if (!killerChampion) {
+                    this.errorMessage(`Unknown champion or skin \`${killer}\``);
+                    return;
+                } else if (!victimChampion) {
+                    this.errorMessage(`Unknown champion or skin \`${victim}\``);
+                    return;
+                }
+            } else if (p.event == 'alias' || p.event == 'bounty') {
+                champion = this.championCache.getChampionFromString(wsr(p.key));
+                skin = this.championCache.getSkinFromString(wsr(p.key));
+                if (!champion) {
+                    this.errorMessage(`Unknown champion or skin \`${p.key}\``);
+                    return;
+                }
+            }
+            switch (p.event.toLowerCase()) {
+                case 'kill':
+                    this.messageEngine.useChannel(this.currentMessage.channel as TextChannel).killMessage(
+                        { summonerName: p.KILLER, championName: killerChampion, skinName: killerSkin, score: 0, kills: 0, deaths: 0, team: '' },
+                        { summonerName: p.VICTIM, championName: victimChampion, skinName: victimSkin, team: '' },
+                    )
+                    break;
+                case 'death':
+                    this.messageEngine.useChannel(this.currentMessage.channel as TextChannel).deathMessage(
+                        { summonerName: p.KILLER, championName: killerChampion, skinName: killerSkin, team: '' },
+                        { summonerName: p.VICTIM, championName: victimChampion, skinName: victimSkin, score: 0, kills: 0, deaths: 0, team: '' },
+                    )
+                    break;
+                case 'bounty':
+                    this.messageEngine.useChannel(this.currentMessage.channel as TextChannel).bountyMessage(
+                        { summonerName: p.BOUNTY_POSTER, championName: '', skinName: '', team: '' },
+                        { summonerName: '', championName: champion, skinName: skin, team: '' },
+                    )
+                    break;
+                case 'gameover':
+                    const message = this.messageEngine.testMessage('gameOverMessages', p.key, { WINNER: p.WINNER });
+                    if (message) this.currentMessage.channel.send(message);
+                    else this.currentMessage.channel.send(`No game over message for \`${p.key}\``);
+                    break;
+                case 'alias':
+                    this.currentMessage.channel.send(this.messageEngine.aliasChampion(champion, skin));
+                    break;
+            }
+        });
     }
 }

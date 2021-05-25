@@ -233,4 +233,14 @@ export class MessageEngine {
             `Catchy ${summoner}`,
         ]) + ' :thumbsup:');
     }
+
+    testMessage(groupKey: string, key: string, variables: { [key: string]: string }): string {
+        let data = this.engineData[groupKey][wsr(key)];
+        if (!data) return null;
+        let message = randomlyPick(data);
+        for (const k in variables) {
+            message = message.replaceAll(`$${k}`, variables[k]);
+        }
+        return message;
+    }
 }
