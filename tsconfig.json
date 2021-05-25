@@ -5,6 +5,7 @@
     "allowSyntheticDefaultImports": true,
     "target": "ES6",
     "lib": [
+      "es2019",
       "ESNext.String"
     ],
     "noImplicitAny": false,

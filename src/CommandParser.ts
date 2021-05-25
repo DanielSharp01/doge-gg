@@ -83,6 +83,21 @@ export class CommandParser<T extends { [key: string]: string }> {
             .setParameter(wordKey, words[index] as T[keyof T]);
     }
 
+    optionalUntilWord(key: keyof T, word: string, caseSensitive?: boolean, wordKey?: keyof T): CommandParser<T> {
+        if (this.error) return this;
+
+        let remaining = this.remaining;
+        const words = remaining.split(' ');
+        const index = words.findIndex(w => wordCase(w, caseSensitive) == wordCase(word, caseSensitive));
+
+        const value = words.slice(0, index || undefined).join(' ');
+        remaining = index >= 0 ? words.slice(index + 1).join(' ') : '';
+        const ret = new CommandParser(remaining.trim(), this.parameters)
+            .setParameter(key, value as T[keyof T]);
+        if (index >= 0) ret.setParameter(wordKey, words[index] as T[keyof T]);
+        return ret;
+    }
+
     expectUntilEnd(key: keyof T): CommandParser<T> {
         if (this.error) return this;
 

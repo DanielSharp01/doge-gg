@@ -1,10 +1,11 @@
-import { Message } from 'discord.js';
+import { Message, TextChannel } from 'discord.js';
 import fs from 'fs';
-import { DiscordBot } from './DiscordBot'
 import { Player } from './Player';
 import { PlayerWithScore } from './PlayerWithScore';
 import { randomInt } from './randomInt';
 import 'ts-replace-all';
+import { SummonerCache } from './SummonerCache';
+import { wsr } from './wsr';
 
 export type StringKeyedStringArray = { [key: string]: Array<string> };
 export type AliasReverseMap = { [key: string]: string | boolean };
@@ -28,16 +29,11 @@ export interface MessageEngineData {
 
 function randomlyPick(arr: Array<string>): string {
     const r = randomInt(0, arr.length);
-    console.log(arr, r);
     return arr[r];
 }
 
-export function wsr(str: string): string {
-    if (!str) return undefined;
-    return str.replace(/(?<!vs)[\s](?!vs)/g, '').replace(/[\/\']/, '').toLowerCase();
-}
-
 export class MessageEngine {
+    private currentChannel: TextChannel;
     private engineData: MessageEngineData = {
         killMessages: {},
         deathMessages: {},
@@ -49,8 +45,13 @@ export class MessageEngine {
 
     private aliasReverseMap: AliasReverseMap;
 
-    constructor(private discordBot: DiscordBot) {
+    constructor(private summonerCache: SummonerCache) {
         this.loadData();
+    }
+
+    useChannel(textChannel: TextChannel): MessageEngine {
+        this.currentChannel = textChannel;
+        return this;
     }
 
     loadData() {
@@ -88,6 +89,19 @@ export class MessageEngine {
         return JSON.stringify(this.engineData, null, 2);
     }
 
+    searchMessages(groupKey: string, key: string) {
+        key = wsr(key);
+        let compareFunction = k => k.includes(key);
+        if (key.includes('vs')) {
+            const [killer, victim] = key.split('vs').map(p => p.trim());
+            compareFunction = k => {
+                const [kr, vm] = k.split('vs').map(p => p.trim());
+                return kr.includes(killer) && vm.includes(victim);
+            }
+        }
+        return Object.keys(this.engineData[groupKey]).filter(compareFunction).map(k => this.engineData[groupKey][k].map(v => `**${k}** - ${v}`)).flat();
+    }
+
     listMessages(groupKey: string, key: string) {
         key = wsr(key);
         return this.engineData[groupKey][key];
@@ -104,22 +118,10 @@ export class MessageEngine {
         this.saveData();
     }
 
-    editMessage(groupKey: string, key: string, index: number, message: string) {
+    removeMessage(groupKey: string, key: string, what: string) {
         key = wsr(key);
         if (!this.engineData[groupKey][key]) throw new Error("No key");
-        if (this.engineData[groupKey][key].length <= index) throw new Error("No index");
-        this.engineData[groupKey][key][index] = message;
-        if (groupKey === 'aliases') {
-            this.recalculateAliasReverseMap();
-        }
-        this.saveData();
-    }
-
-    removeMessage(groupKey: string, key: string, index: number) {
-        key = wsr(key);
-        if (!this.engineData[groupKey][key]) throw new Error("No key");
-        if (this.engineData[groupKey][key].length <= index) throw new Error("No index");
-        this.engineData[groupKey][key].splice(index, 1);
+        this.engineData[groupKey][key] = this.engineData[groupKey][key].filter(msg => !msg.includes(what));
         if (groupKey === 'aliases') {
             this.recalculateAliasReverseMap();
         }
@@ -127,7 +129,7 @@ export class MessageEngine {
     }
 
     processKillMessage(message: string, data: { killer: string, killerChampion: string, killerChampionSkin: string, victimChampion: string, victimChampionSkin: string }) {
-        const killer = this.discordBot.getMentionOrNot(data.killer) + (!this.discordBot.hasMention(data.killer) ? ` (${this.aliasChampion(data.killerChampion, data.killerChampionSkin)})` : '');
+        const killer = this.summonerCache.getMentionOrNot(data.killer) + (!this.summonerCache.hasMention(data.killer) ? ` (${this.aliasChampion(data.killerChampion, data.killerChampionSkin)})` : '');
         return message.replaceAll('$KILLER', killer)
             .replaceAll('$KILLER_NOALIAS', killer)
             .replaceAll('$VICTIM', this.aliasChampion(data.victimChampion, data.victimChampion))
@@ -135,7 +137,7 @@ export class MessageEngine {
     }
 
     processDeathMessage(message: string, data: { killerChampion: string, killerChampionSkin: string, victim: string, victimChampion: string, victimChampionSkin: string }) {
-        const victim = this.discordBot.getMentionOrNot(data.victim) + (!this.discordBot.hasMention(data.victim) ? ` (${this.aliasChampion(data.victimChampion, data.victimChampionSkin)})` : '');
+        const victim = this.summonerCache.getMentionOrNot(data.victim) + (!this.summonerCache.hasMention(data.victim) ? ` (${this.aliasChampion(data.victimChampion, data.victimChampionSkin)})` : '');
         return message.replaceAll('$KILLER', this.aliasChampion(data.killerChampion, data.killerChampionSkin))
             .replaceAll('$KILLER_NOALIAS', data.killerChampion)
             .replaceAll('$VICTIM', victim)
@@ -143,7 +145,7 @@ export class MessageEngine {
     }
 
     processBountyMessage(message: string, data: { bountyPoster: string, champion: string, championSkin: string }) {
-        return message.replaceAll('$BOUNTY_POSTER', this.discordBot.getMentionOrNot(data.bountyPoster))
+        return message.replaceAll('$BOUNTY_POSTER', this.summonerCache.getMentionOrNot(data.bountyPoster))
             .replaceAll('$CHAMPION', this.aliasChampion(data.champion, data.championSkin))
             .replaceAll('$CHAMPION_NOALIAS', data.champion);
     }
@@ -185,27 +187,27 @@ export class MessageEngine {
 
     killMessage(killer: PlayerWithScore, victim: Player) {
         const possible = ['$KILLER killed $VICTIM', ...this.getChampionVsMessages('killDeathMessages', killer, victim), ...this.getChampionVsMessages('killMessages', killer, victim)];
-        this.discordBot.sendMessage(this.processKillMessage(randomlyPick(possible),
+        this.currentChannel.send(this.processKillMessage(randomlyPick(possible),
             { killer: killer.summonerName, killerChampion: killer.championName, killerChampionSkin: killer.skinName, victimChampion: victim.championName, victimChampionSkin: victim.skinName }));
     }
 
     deathMessage(killer: Player, victim: PlayerWithScore) {
         const possible = ['$VICTIM died to $KILLER', ...this.getChampionVsMessages('killDeathMessages', killer, victim), ...this.getChampionVsMessages('deathMessages', killer, victim)];
-        this.discordBot.sendMessage(this.processDeathMessage(randomlyPick(possible),
+        this.currentChannel.send(this.processDeathMessage(randomlyPick(possible),
             { killerChampion: killer.championName, killerChampionSkin: killer.skinName, victim: victim.summonerName, victimChampion: victim.championName, victimChampionSkin: victim.skinName }));
     }
 
     bountyMessage(bountyPoster: Player, bounty: Player) {
         const possible = ['$BOUNTY_POSTER set out a bounty on $CHAMPION :coin:', ...this.getChampionMessages('bountyMessages', bounty.championName, bounty.skinName)];
-        this.discordBot.sendMessage(this.processBountyMessage(randomlyPick(possible), { bountyPoster: bountyPoster.summonerName, champion: bounty.championName, championSkin: bounty.skinName }));
+        this.currentChannel.send(this.processBountyMessage(randomlyPick(possible), { bountyPoster: bountyPoster.summonerName, champion: bounty.championName, championSkin: bounty.skinName }));
     }
 
     gameOverMessage(winners: Array<PlayerWithScore>) {
-        const winnerNames = winners.map(w => this.discordBot.getMentionOrNot(w.summonerName));
+        const winnerNames = winners.map(w => this.summonerCache.getMentionOrNot(w.summonerName));
         const winner = winnerNames.length > 1 ? winnerNames.slice(0, winnerNames.length - 1).join(', ') + ' and ' + winnerNames[winnerNames.length - 1] : winnerNames[0];
         const winnerScore = winners[0].score;
 
-        this.discordBot.sendMessage(this.processGameOverMessage((() => {
+        this.currentChannel.send(this.processGameOverMessage((() => {
             if (winners.length === 5) {
                 return randomlyPick(this.engineData.gameOverMessages.totaltie);
             } else if (winnerScore < 0) {
