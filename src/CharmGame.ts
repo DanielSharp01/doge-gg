@@ -32,6 +32,7 @@ export class CharmGame extends MiniGame {
     }
 
     equals(other: MiniGame): boolean {
+        if (other.textChannel != this.textChannel) return false;
         if (!(other instanceof CharmGame)) return false;
         const otherGame = other as CharmGame;
         return otherGame.summonerName == this.summonerName;

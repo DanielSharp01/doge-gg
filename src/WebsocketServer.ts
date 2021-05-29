@@ -25,12 +25,14 @@ export function startWebsocketServer(gameManager: GameManager) {
                 connectedGame.addClient(uuid);
             }
             else if (message.type == "clientDisconnected") {
-                connectedGame.removeClient(uuid);
+                connectedGame?.removeClient(uuid);
+                connectedGame = null;
             }
             else connectedGame?.onMessage(message);
         });
         ws.on('close', () => {
-            connectedGame.removeClient(uuid);
+            connectedGame?.removeClient(uuid);
+            connectedGame = null;
         })
     });
 

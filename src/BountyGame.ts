@@ -53,6 +53,7 @@ export class BountyGame extends MiniGame {
     }
 
     equals(other: MiniGame): boolean {
+        if (other.textChannel != this.textChannel) return false;
         if (!(other instanceof BountyGame)) return false;
         const otherGame = other as BountyGame;
         if (!otherGame.allies.find(a => a.summonerName == this.allies[0].summonerName)) return false;

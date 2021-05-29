@@ -34,6 +34,7 @@ export class GameManager {
             }
         }
 
+
         this.games = this.games.filter(g => !removables.has(g));
     }
 
