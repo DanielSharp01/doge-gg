@@ -3,6 +3,7 @@ import { Player } from './Player';
 import AsciiTable from 'ascii-table';
 import { GameEvent } from './GameEvent';
 import { MiniGame, MiniGameContext } from './MiniGame';
+import { BountyGameResult } from './db/BountyGameResult';
 
 export class BountyGame extends MiniGame {
     private allies: Array<PlayerWithScore>;
@@ -24,7 +25,6 @@ export class BountyGame extends MiniGame {
         const sortedScores = [...this.allies];
         sortedScores.sort((a, b) => b.score - a.score);
         const table = new AsciiTable(`${this.enemy.championName}'s bounty`);
-        table.set
         table.setHeading('Place', 'Name', 'Score', 'Kills', 'Deaths');
         sortedScores.forEach((s, i) => table.addRow(i + 1, s.summonerName, s.score, s.kills, s.deaths));
         this.textChannel.send(table.toString(), { code: true });
@@ -50,6 +50,7 @@ export class BountyGame extends MiniGame {
         const maxScore = Math.max(...this.allies.map(p => p.score));
         const winners = this.allies.filter(p => p.score === maxScore);
         this.messageEngine.useChannel(this.textChannel).gameOverMessage(winners);
+        new BountyGameResult({ enemyChampion: this.enemy.championName, players: this.allies }).save().then();
     }
 
     equals(other: MiniGame): boolean {

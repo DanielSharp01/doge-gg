@@ -12,6 +12,7 @@ export interface MiniGameContext {
 export abstract class MiniGame {
     constructor(protected context: MiniGameContext) { }
     abstract startGame(events: GameEvent[]);
+    setTextChannel(textChannel: TextChannel) { }
     abstract onEvent(event: GameEvent, announce: boolean);
     abstract onGameOver();
     abstract equals(miniGame: MiniGame): boolean;

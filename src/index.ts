@@ -6,11 +6,19 @@ import { MessageEngine } from './MessageEngine';
 import { startWebsocketServer } from './WebsocketServer';
 import { SummonerCache } from './SummonerCache';
 import { ChampionCache } from './ChampionCache';
+import mongoose from 'mongoose';
+import { BountyGameResult } from './db/BountyGameResult';
+import { CharmGameResult } from './db/CharmGameResult';
 
 config();
-
 const championCache = new ChampionCache();
-championCache.requestOrLoadData().then(() => {
+championCache.requestOrLoadData().then(async () => {
+    await mongoose.connect(process.env.MONGOCONN.replace("<DB>", "doge-gg"), {
+        useNewUrlParser: true,
+        useCreateIndex: true,
+        useFindAndModify: false,
+        useUnifiedTopology: true
+    });
     const summonerCache = new SummonerCache();
     const messageEngine = new MessageEngine(summonerCache);
     const gameManager = new GameManager(messageEngine, summonerCache)

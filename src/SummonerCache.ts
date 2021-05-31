@@ -9,6 +9,10 @@ export class SummonerCache {
         }
     }
 
+    public get summonerList() {
+        return Object.values(this.summoners);
+    }
+
     setSummoner(discordId: string, summoner: string) {
         this.summoners[discordId] = summoner;
         this.saveSummoners();

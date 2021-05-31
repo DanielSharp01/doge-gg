@@ -7,11 +7,9 @@ import { GameManager } from './GameManager';
 import { BountyGame } from './BountyGame';
 import { wsr } from './wsr';
 import { ChampionCache } from './ChampionCache';
-
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-});
+import { BountyGameResult } from './db/BountyGameResult';
+import AsciiTable from 'ascii-table';
+import { CharmGameResult } from './db/CharmGameResult';
 
 type aliasHandlerArgs = { action?: string, champion?: string, what?: string };
 type onHandlerVsArgs = { killer: string, victim: string, action: string, what?: string };
@@ -44,7 +42,7 @@ export class CommandHandler {
         if (!message.content.startsWith('!gg')) return;
         this.currentMessage = message;
         const parser = new CommandParser<{ action: string }>(message.content);
-        const actions = ['me', 'charm', 'score', 'bounty', 'on', 'alias'];
+        const actions = ['me', 'charm', 'leaderboard', 'score', 'bounty', 'on', 'alias'];
         parser.expectWord('!gg').expectAnyWord('action')
             .executeError(() => {
                 this.errorMessage(`No action specified use one of ${actions.map(a => `\`${a}\``).join(', ')}`);
@@ -55,13 +53,16 @@ export class CommandHandler {
                         this.meHandler(parser.reparemetrize<{ summoner: string }>());
                         break;
                     case 'charm':
-                        this.charmHandler();
+                        this.charmHandler(parser.reparemetrize<{ stats: string }>());
                         break;
                     case 'score':
                         this.scoreHandler();
                         break;
                     case 'bounty':
                         this.bountyHandler(parser.reparemetrize<{ champion: string }>());
+                        break;
+                    case 'leaderboard':
+                        this.leaderboard();
                         break;
                     case 'alias':
                         this.aliasHandler(parser.reparemetrize<aliasHandlerArgs>());
@@ -116,21 +117,52 @@ export class CommandHandler {
         });
     }
 
-    async charmHandler() {
+    async charmHandler(parser: CommandParser<{ stats: string }>) {
         const summoner = this.getSummoner();
         if (!summoner) return;
-        const charmRes = await this.gameManager.startCharmGame(this.currentMessage.channel as TextChannel, this.summonerCache.getSummoner(this.currentMessage.author.id));
-        this.currentMessage.react('⏳');
-        if (!charmRes.found) {
+        if (!parser.optionalUntilEnd('stats').parameters.stats) {
+            const charmRes = await this.gameManager.startCharmGame(this.currentMessage.channel as TextChannel, this.summonerCache.getSummoner(this.currentMessage.author.id));
             this.currentMessage.react('⏳');
-            this.errorMessage('Could not find your game :pensive: Make sure the Doge.gg client is running for you or for a friend in game with you.');
-        } else if (!charmRes.ahriFound) {
-            this.currentMessage.react('⏳');
-            this.errorMessage(`You are not playing Ahri :rolling_eyes:`);
+            if (!charmRes.found) {
+                this.currentMessage.react('⏳');
+                this.errorMessage('Could not find your game :pensive: Make sure the Doge.gg client is running for you or for a friend in game with you.');
+            } else if (!charmRes.ahriFound) {
+                this.currentMessage.react('⏳');
+                this.errorMessage(`You are not playing Ahri :rolling_eyes:`);
+            } else {
+                this.currentMessage.react('⏳');
+                this.currentMessage.react('👍');
+            }
         } else {
-            this.currentMessage.react('⏳');
-            this.currentMessage.react('👍');
+            const stats: { charmHit: number, charmCast: number } = (await CharmGameResult.find({ summoner }).exec() as any[]).reduce((acc, game) => {
+                return { charmHit: acc.charmHit + game.charmHit, charmCast: acc.charmCast + game.charmCast };
+            }, { charmHit: 0, charmCast: 0 });
+            this.currentMessage.reply(`'s charm stats ${stats.charmHit}/${stats.charmCast} (${stats.charmCast && Math.round(stats.charmHit / stats.charmCast * 10000) / 100})`);
         }
+    }
+
+    async leaderboard() {
+        const games = await BountyGameResult.find({}).exec() as any[];
+        const playerSet = {};
+        for (const g of games) {
+            for (const p of g.players) {
+                if (!playerSet[p.summonerName]) {
+                    playerSet[p.summonerName] = { score: 0, kills: 0, deaths: 0 };
+                }
+                playerSet[p.summonerName].score += p.score;
+                playerSet[p.summonerName].kills += p.kills;
+                playerSet[p.summonerName].deaths += p.deaths;
+            }
+        }
+        const players = Object.keys(playerSet).filter(k => this.summonerCache.hasMention(k)).reduce((acc, k) => {
+            acc.push({ summonerName: k, ...playerSet[k] });
+            return acc;
+        }, []);
+        players.sort((a, b) => b.score - a.score);
+        const table = new AsciiTable('Leaderboard');
+        table.setHeading('Place', 'Name', 'Score', 'Kills', 'Deaths');
+        players.forEach((s, i) => table.addRow(i + 1, s.summonerName, s.score, s.kills, s.deaths));
+        this.currentMessage.channel.send(table.toString(), { code: true });
     }
 
     scoreHandler() {

@@ -1,5 +1,7 @@
 import { GameEvent } from './GameEvent';
 import { MiniGame, MiniGameContext } from './MiniGame';
+import { CharmGameResult } from './db/CharmGameResult';
+import { TextChannel } from 'discord.js';
 
 export class CharmGame extends MiniGame {
     private charmCast: number = 0;
@@ -11,12 +13,16 @@ export class CharmGame extends MiniGame {
 
     constructor(context: MiniGameContext, private summonerName: string) {
         super(context);
-        this.textChannel.send(`Tracking your charms ${this.summonerCache.getMentionOrNot(summonerName)} :fox: :heart:`);
     }
 
     public startGame(events: GameEvent[]) {
-        this.textChannel.send(`Tracking your charms ${this.summonerCache.getMentionOrNot(this.summonerName)} :fox: :heart:`);
+        this.textChannel?.send(`Tracking your charms ${this.summonerCache.getMentionOrNot(this.summonerName)} :fox: :heart:`);
         events.forEach(e => this.onEvent(e, false));
+    }
+
+    public setTextChannel(textChannel: TextChannel) {
+        this.context.textChannel = textChannel;
+        this.textChannel?.send(`Tracking your charms ${this.summonerCache.getMentionOrNot(this.summonerName)} :fox: :heart:`);
     }
 
     public onEvent(event: GameEvent, announce: boolean) {
@@ -28,7 +34,8 @@ export class CharmGame extends MiniGame {
     }
 
     public onGameOver() {
-        this.textChannel.send(`Charm tracking for ${this.summonerCache.getMentionOrNot(this.summonerName)} ended with ${this.charmHit}/${this.charmCast}`);
+        this.textChannel?.send(`${this.summonerCache.getMentionOrNot(this.summonerName)}'s charm stats for this game ${this.charmHit}/${this.charmCast} (${this.charmCast && Math.round(this.charmHit / this.charmCast * 10000) / 100})`);
+        if (this.charmCast > 0) new CharmGameResult({ summoner: this.summonerName, charmCast: this.charmCast, charmHit: this.charmHit }).save().then();
     }
 
     equals(other: MiniGame): boolean {

@@ -20,10 +20,13 @@ export class Game {
     }
 
     public startMiniGame(miniGame: MiniGame): boolean {
-        if (!this.miniGames.some(g => g.equals(miniGame))) {
+        const existing = this.miniGames.find(g => g.equals(miniGame))
+        if (!existing) {
             this.miniGames.push(miniGame);
             miniGame.startGame(this.events);
             return true;
+        } else if (!existing.textChannel) {
+            existing.setTextChannel(miniGame.textChannel);
         }
         return false;
     }
