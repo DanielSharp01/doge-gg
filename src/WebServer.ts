@@ -1,5 +1,5 @@
 import { AddressInfo } from 'net';
-import express from 'express';
+import express, { Router } from 'express';
 import { createServer as createHttpServer } from 'http';
 import WebSocket, { Server as WebSocketServer } from 'ws';
 import { GameClientMessage } from './GameClientMessage';
@@ -80,21 +80,23 @@ export function startWebServer(gameManager: GameManager) {
         }
     }
 
-    app.get('/clients', (req, res, next) => {
+    const apiRouter = Router();
+    apiRouter.get('/clients', (req, res, next) => {
         res.json([...uuidSummonerMap.entries()].map(([uuid, activePlayerName]) => ({
             uuid,
             activePlayerName,
         })));
     });
 
-    app.get('/games', (req, res, next) => {
+    apiRouter.get('/games', (req, res, next) => {
         res.json(gameManager.games.map(mapGame));
     });
 
-    app.get('/games/:uuid', (req, res, next) => {
+    apiRouter.get('/games/:uuid', (req, res, next) => {
         res.json(mapGame(gameManager.games.find(g => g.uuid == req.params.uuid)));
     });
 
+    app.use('/discord-bot/api', apiRouter);
     server.listen(process.env.PORT || 5050, () => {
         console.log(`Server started on port ${(server.address() as AddressInfo).port}`);
     });
