@@ -90,9 +90,8 @@ export class GameManager {
     }
 
     startImplicitMiniGames(game: Game) {
-        for (const summoner in this.summonerCache.summonerList) {
+        for (const summoner of this.summonerCache.summonerList) {
             if (game.players.find(p => p.summonerName === summoner)?.championName === 'Ahri') {
-                console.log('Starting implicit charm game');
                 this.startMiniGame(game, new CharmGame(this.createMiniGameContext(null), summoner));
             }
         }

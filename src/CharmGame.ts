@@ -4,11 +4,19 @@ import { CharmGameResult } from './db/CharmGameResult';
 import { TextChannel } from 'discord.js';
 
 export class CharmGame extends MiniGame {
-    private charmCast: number = 0;
-    private charmHit: number = 0;
+    private _charmCast: number = 0;
+    private _charmHit: number = 0;
 
     public get summoner() {
         return this.summonerName;
+    }
+
+    public get charmCast() {
+        return this._charmCast;
+    }
+
+    public get charmHit() {
+        return this._charmHit;
     }
 
     constructor(context: MiniGameContext, private summonerName: string) {
@@ -27,19 +35,18 @@ export class CharmGame extends MiniGame {
 
     public onEvent(event: GameEvent, announce: boolean) {
         if (event.EventName === 'CharmCast') {
-            this.charmCast++;
+            this._charmCast++;
         } else if (event.EventName === 'CharmHit') {
-            this.charmHit++;
+            this._charmHit++;
         }
     }
 
     public onGameOver() {
-        this.textChannel?.send(`${this.summonerCache.getMentionOrNot(this.summonerName)}'s charm stats for this game ${this.charmHit}/${this.charmCast} (${this.charmCast && Math.round(this.charmHit / this.charmCast * 10000) / 100})`);
-        if (this.charmCast > 0) new CharmGameResult({ summoner: this.summonerName, charmCast: this.charmCast, charmHit: this.charmHit }).save().then();
+        this.textChannel?.send(`${this.summonerCache.getMentionOrNot(this.summonerName)}'s charm stats for this game ${this._charmHit}/${this._charmCast} (${this._charmCast && Math.round(this._charmHit / this._charmCast * 10000) / 100})`);
+        if (this._charmCast > 0) new CharmGameResult({ summoner: this.summonerName, charmCast: this._charmCast, charmHit: this._charmHit }).save().then();
     }
 
     equals(other: MiniGame): boolean {
-        if (other.textChannel != this.textChannel) return false;
         if (!(other instanceof CharmGame)) return false;
         const otherGame = other as CharmGame;
         return otherGame.summonerName == this.summonerName;

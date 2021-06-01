@@ -2,28 +2,39 @@ import { Player } from './Player';
 import { GameEvent } from './GameEvent';
 import { GameClientMessage } from './GameClientMessage';
 import { MiniGame } from './MiniGame';
+import { v4 as uuidv4 } from 'uuid';
 
 export class Game {
-    private events: Array<GameEvent> = [];
+    private _events: Array<GameEvent> = [];
     private _players: Array<Player>;
     public miniGames: Array<MiniGame> = [];
+    private _uuid: string;
     private _clientUuids = new Set<string>();
     private _lastHadClients = 0;
 
     public get players() {
-        return this._players;
+        return this._players.slice();
+    }
+
+    public get events() {
+        return this._events.slice();
     }
 
     constructor(players: Player[]) {
         this._players = players.sort((a, b) => a.summonerName.localeCompare(b.summonerName));
-        this.events = [];
+        this._events = [];
+        this._uuid = uuidv4();
+    }
+
+    public get uuid(): string {
+        return this._uuid;
     }
 
     public startMiniGame(miniGame: MiniGame): boolean {
         const existing = this.miniGames.find(g => g.equals(miniGame))
         if (!existing) {
             this.miniGames.push(miniGame);
-            miniGame.startGame(this.events);
+            miniGame.startGame(this._events);
             return true;
         } else if (!existing.textChannel) {
             existing.setTextChannel(miniGame.textChannel);
@@ -32,12 +43,12 @@ export class Game {
     }
 
     private onEvent(event: GameEvent) {
-        if (this.events.some(e => this.eventsEssentiallyEqual(event, e))) return;
+        if (this._events.some(e => this.eventsEssentiallyEqual(event, e))) return;
         if (event.EventName === 'GameEnd') {
             this.onGameOver();
             return;
         }
-        this.events.push(event);
+        this._events.push(event);
         this.miniGames.forEach(b => b.onEvent(event, true));
     }
 
@@ -81,5 +92,9 @@ export class Game {
 
     get lastHadClients() {
         return this._lastHadClients;
+    }
+
+    get clients() {
+        return this._clientUuids.values();
     }
 }
