@@ -54,7 +54,7 @@ export class BountyGame extends MiniGame {
         const maxScore = Math.max(...this._allies.map(p => p.score));
         const winners = this._allies.filter(p => p.score === maxScore);
         this.messageEngine.useChannel(this.textChannel).gameOverMessage(winners);
-        new BountyGameResult({ enemyChampion: this.enemy.championName, startDate: new Date(this.timestamp), players: this._allies }).save().then();
+        new BountyGameResult({ enemyChampion: this.enemy.championName, startDate: this.startDate, players: this._allies }).save().then();
     }
 
     equals(other: MiniGame): boolean {

@@ -10,9 +10,9 @@ export interface MiniGameContext {
 }
 
 export abstract class MiniGame {
-    private _timestamp: number;
+    private _startDate: Date;
     constructor(protected context: MiniGameContext) {
-        this._timestamp = new Date().getTime();
+        this._startDate = new Date();
     }
     abstract startGame(events: GameEvent[]);
     setTextChannel(textChannel: TextChannel) { }
@@ -23,5 +23,5 @@ export abstract class MiniGame {
     public get textChannel() { return this.context.textChannel; }
     protected get summonerCache() { return this.context.summonerCache; }
     protected get messageEngine() { return this.context.messageEngine; }
-    public get timestamp() { return this._timestamp; }
+    public get startDate() { return this._startDate; }
 }

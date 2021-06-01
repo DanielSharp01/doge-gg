@@ -43,7 +43,7 @@ export class CharmGame extends MiniGame {
 
     public onGameOver() {
         this.textChannel?.send(`${this.summonerCache.getMentionOrNot(this.summonerName)}'s charm stats for this game ${this._charmHit}/${this._charmCast} (${this._charmCast && Math.round(this._charmHit / this._charmCast * 10000) / 100})`);
-        if (this._charmCast > 0) new CharmGameResult({ summoner: this.summonerName, startDate: new Date(this.timestamp), charmCast: this._charmCast, charmHit: this._charmHit }).save().then();
+        if (this._charmCast > 0) new CharmGameResult({ summoner: this.summonerName, startDate: this.startDate, charmCast: this._charmCast, charmHit: this._charmHit }).save().then();
     }
 
     equals(other: MiniGame): boolean {
