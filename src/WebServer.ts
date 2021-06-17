@@ -96,7 +96,7 @@ export function startWebServer(gameManager: GameManager) {
         res.json(mapGame(gameManager.games.find(g => g.uuid == req.params.uuid)));
     });
 
-    app.use('/discord-bot/api', apiRouter);
+    app.use('/api', apiRouter);
     server.listen(process.env.PORT || 5050, () => {
         console.log(`Server started on port ${(server.address() as AddressInfo).port}`);
     });
