@@ -10,6 +10,7 @@ import { ChampionCache } from './ChampionCache';
 import { BountyGameResult } from './db/BountyGameResult';
 import AsciiTable from 'ascii-table';
 import { CharmGameResult } from './db/CharmGameResult';
+import { shutupHandler, singHandler, skipHandler } from './SingModule';
 
 type aliasHandlerArgs = { action?: string, champion?: string, what?: string };
 type onHandlerVsArgs = { killer: string, victim: string, action: string, what?: string };
@@ -42,7 +43,7 @@ export class CommandHandler {
         if (!message.content.startsWith('!gg')) return;
         this.currentMessage = message;
         const parser = new CommandParser<{ action: string }>(message.content);
-        const actions = ['me', 'charm', 'leaderboard', 'score', 'bounty', 'on', 'alias'];
+        const actions = ['me', 'charm', 'leaderboard', 'score', 'bounty', 'on', 'alias', 'sing', 'skip', 'shutup'];
         parser.expectWord('!gg').expectAnyWord('action')
             .executeError(() => {
                 this.errorMessage(`No action specified use one of ${actions.map(a => `\`${a}\``).join(', ')}`);
@@ -72,6 +73,16 @@ export class CommandHandler {
                         break;
                     case 'test':
                         this.testHandler(parser.reparemetrize<{ event: string, key: string }>());
+                        break;
+                    // Music commands
+                    case 'sing':
+                        singHandler(message, parser.reparemetrize<{ link: string }>().expectUntilEnd('link'));
+                        break;
+                    case 'skip':
+                        skipHandler(message, parser.reparemetrize<{ }>());
+                        break;
+                    case 'shutup':
+                        shutupHandler(message, parser.reparemetrize<{ }>());
                         break;
                     default:
                         this.errorMessage(`No such action \`${action}\` use one of ${actions.map(a => `\`${a}\``).join(', ')}`);
@@ -250,6 +261,7 @@ export class CommandHandler {
             },
         );
     }
+    
     validateChampion(champion: string): boolean {
         if (champion != '?' && !this.championCache.getChampionFromString(champion)) {
             this.errorMessage(`${champion} is not a valid champion or skin.`);
